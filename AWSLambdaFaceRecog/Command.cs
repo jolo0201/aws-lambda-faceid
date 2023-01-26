@@ -1,7 +1,7 @@
 ﻿using Com.FirstSolver.Splash;
 using Microsoft.VisualBasic;
 using System.Net.Sockets;
-
+using System.Text.Json;
 
 class Command
 {
@@ -74,6 +74,11 @@ class Command
         S.Close();
         S.Dispose();
         return Result;
+    }
+
+    public static string GetJsonResult(object obj)
+    {
+        return JsonSerializer.Serialize(obj);
     }
 
 }

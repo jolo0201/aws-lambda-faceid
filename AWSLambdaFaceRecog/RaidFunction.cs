@@ -1,9 +1,9 @@
 ﻿using Amazon.Lambda.Core;
 using Com.FirstSolver.Splash;
-using DotNetEnv;
 using Microsoft.VisualBasic;
 using MySql.Data.MySqlClient;
-using System.Net.Sockets;
+using Newtonsoft.Json.Linq;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 // Assembly attribute to enable the Lambda function's JSON input to be converted into a .NET class.
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.SystemTextJson.DefaultLambdaJsonSerializer))]
@@ -23,6 +23,9 @@ public class RaidFunction
         DotNetEnv.Env.TraversePath().Load();
 
         //Environment Variable from AWS
+
+        //return json string
+        var jsonObject = new JObject();
         try
         {
             //Read active devices
@@ -47,8 +50,6 @@ public class RaidFunction
                         DeviceId = readDevice["id"].ToString(),
                         DeviceName = readDevice["device_name"].ToString()
                     }); // Add devices as objects
-
-      
                 }//while
 
                 readDevice.Close(); //close reader
@@ -98,35 +99,55 @@ public class RaidFunction
                                     Database.TimeLoggerFR(empId, fworkCode, fTime, fDate, deviceSetting.DeviceId);
                                 }
                                 context.Logger.LogTrace($"Successfully raided ({dataCount}) rows of data. | {startDate} to {endDate}.");
-                                return $"Successfully raided ({dataCount}) rows of data. | {startDate} to {endDate}.";
+
+                                jsonObject.Add("result", "success");
+                                jsonObject.Add("data_ctr", dataCount);
+                                jsonObject.Add("start_date", startDate);
+                                jsonObject.Add("end_date", endDate);
+
+                                return jsonObject.ToString();
                             }
                             else
                             {
                                 context.Logger.LogTrace("Success but no matches.");
-                                return $"Success but no matches.";
+                                jsonObject.Add("result", "success");
+                                jsonObject.Add("data_ctr", 0);
+                                jsonObject.Add("start_date", startDate);
+                                jsonObject.Add("end_date", endDate);
+
+                                return jsonObject.ToString();
                             }//matches
                         }
                         else
                         {
                             Console.WriteLine("Error FaceId:" + ErrorCode.ToString());
                             context.Logger.LogError("Error FaceId:" + ErrorCode.ToString());
-                            return "Error FaceId:" + ErrorCode.ToString();
+                            jsonObject.Add("result", "error");
+                            jsonObject.Add("details","FaceId: " + ErrorCode.ToString());
+                            return jsonObject.ToString();
                         }//Errorcode
                     }//detect device
                 }//foreach
                 context.Logger.LogTrace("Successfully raided device.");
-                return "Successfully raided device.";
+                jsonObject.Add("result", "success");
+                jsonObject.Add("details", "Successfully raided device.");
+
+                return jsonObject.ToString();
             }
             else 
             {
                 context.Logger.LogTrace("No device list found.");
-                return "No device list found.";
+                jsonObject.Add("result", "success");
+                jsonObject.Add("details", "No device list found.");
+                return jsonObject.ToString();
             }//read device
         }//try
         catch (Exception ex)
         {
             context.Logger.LogError($"Error in Lambda function:{ex}");
-            return $"Error 404: {ex}";
+            jsonObject.Add("result", "error");
+            jsonObject.Add("details", $"Error 404: {ex}");
+            return jsonObject.ToString();
         }
     }
 }
