@@ -111,7 +111,7 @@ public class RaidFunction
         catch (Exception ex)
         {
             context.Logger.LogError($"Error in Lambda function:{ex}");
-            return "Error 404" + ex.ToString();
+            return $"Error 404: {ex}";
         }
     }
 }
