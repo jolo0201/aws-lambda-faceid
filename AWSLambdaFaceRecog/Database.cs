@@ -9,7 +9,7 @@ class Database
         DateTime startDate = DateTime.Now;
         try
         {
-            using var connection = new MySqlConnection($"{Env.GetString("CONNECTION_STRING")}");
+            using var connection = new MySqlConnection($"{Environment.GetEnvironmentVariable("CONNECTION_STRING")}");
             connection.Open();
 
             MySqlCommand command = new($"SELECT COALESCE(raid_dnt,NOW()) As result FROM time_logger_fr WHERE device_id = {id} ORDER BY raid_dnt DESC LIMIT 1;", connection)
@@ -46,7 +46,7 @@ class Database
         DateTime TimeNow;
         try
         {
-            using var conn = new MySqlConnection($"{Env.GetString("CONNECTION_STRING")}");
+            using var conn = new MySqlConnection($"{Environment.GetEnvironmentVariable("CONNECTION_STRING")}");
             conn.Open();
             MySqlCommand cmd_now = new("SELECT NOW();", conn)
             {
@@ -70,7 +70,7 @@ class Database
         try
         {
 
-            using var conn = new MySqlConnection($"{Env.GetString("CONNECTION_STRING")}");
+            using var conn = new MySqlConnection($"{Environment.GetEnvironmentVariable("CONNECTION_STRING")}");
             conn.Open();
             string fSQL = @"
                 INSERT INTO time_logger_fr(

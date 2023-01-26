@@ -363,3 +363,4 @@ MigrationBackup/
 FodyWeavers.xsd
 
 .env
+aws-lambda-tools-defaults.json

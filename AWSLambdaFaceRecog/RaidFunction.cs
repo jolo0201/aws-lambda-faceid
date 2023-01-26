@@ -19,13 +19,14 @@ public class RaidFunction
     /// <returns></returns>
     public static string RaidFunctionHandler(ILambdaContext context)
     {
-        //Load ENV file configuration
+        //Load ENV file configuration if local
         DotNetEnv.Env.TraversePath().Load();
 
+        //Environment Variable from AWS
         try
         {
             //Read active devices
-            using var connection = new MySqlConnection($"{Env.GetString("CONNECTION_STRING")}");
+            using var connection = new MySqlConnection($"{Environment.GetEnvironmentVariable("CONNECTION_STRING")}");
             connection.Open();
             MySqlCommand command = new("SELECT * FROM config_devices WHERE d_status = 1;", connection)
             {
