@@ -20,12 +20,19 @@ public class RaidFunction
     public static string RaidFunctionHandler(ILambdaContext context)
     {
         //Load ENV file configuration
-        DotNetEnv.Env.Load();
+        DotNetEnv.Env.TraversePath().Load();
 
         try
         {
             //Read active devices
-            MySqlDataReader readDevice = Database.mExecuteReaderDbCon("SELECT * FROM config_devices WHERE d_status = 1;");
+            using var connection = new MySqlConnection($"{Env.GetString("CONNECTION_STRING")}");
+            connection.Open();
+            MySqlCommand command = new("SELECT * FROM config_devices WHERE d_status = 1;", connection)
+            {
+                CommandTimeout = 0
+            };
+            MySqlDataReader readDevice = command.ExecuteReader();
+
             if (readDevice.HasRows == true)
             {
                 List<DeviceSettings> _devicesData = new();
@@ -59,8 +66,8 @@ public class RaidFunction
                     }
                     else 
                     {
-                        var endDate = Strings.Format(Database.ServerNow, "yyyy-MM-dd HH:mm:ss"); //Get Database Server time
-                        var startDate = Strings.Format(Database.GetLatestDateRaid(deviceSetting.DeviceId), "yyyy-MM-dd HH:mm:ss"); //Get Latest Raided Date
+                        string endDate = Strings.Format(Database.ServerNow(), "yyyy-MM-dd HH:mm:ss"); //Get Database Server time
+                        string startDate = Strings.Format(Database.GetLatestDateRaid(deviceSetting.DeviceId), "yyyy-MM-dd HH:mm:ss"); //Get Latest Raided Date
                         string empId, fTime, fDate, fworkCode;
                       
                         using FaceId Client = new(deviceSetting.IP, int.Parse(deviceSetting.Port));
@@ -74,12 +81,13 @@ public class RaidFunction
                             string Pattern = @"\b(time=.+" + Environment.NewLine + "(?:photo=\"[^\"]+\")*)";
                             MatchCollection matches = Regex.Matches(AnswerString, Pattern);
                             int dataCount;
+                            
                             if (matches != null)
                             {
                                 dataCount = matches.Count;
                                 foreach (Match match in matches.Cast<Match>())
                                 {
-                                    var stringS = Command.GetParameterValue(match.Groups[1].Value, "time", "id");
+                                    string stringS = Command.GetParameterValue(match.Groups[1].Value, "time", "id");
                                     string formattedDateString = stringS.Insert(10, " ");
                                     DateTime sampleDate = DateTime.Parse(formattedDateString);
                                     empId = Command.GetParameterValue(match.Groups[1].Value, "id", "name");
@@ -88,23 +96,29 @@ public class RaidFunction
                                     fworkCode = Command.GetParameterValue(match.Groups[1].Value, "status", "authority");
                                     Database.TimeLoggerFR(empId, fworkCode, fTime, fDate, deviceSetting.DeviceId);
                                 }
-                                return $"Successfully raided ({dataCount}) device data.";
+                                context.Logger.LogTrace($"Successfully raided ({dataCount}) rows of data. | {startDate} to {endDate}.");
+                                return $"Successfully raided ({dataCount}) rows of data. | {startDate} to {endDate}.";
                             }
                             else
                             {
+                                context.Logger.LogTrace("Success but no matches.");
                                 return $"Success but no matches.";
                             }//matches
                         }
                         else
                         {
-                            Console.WriteLine("Error occurred.");
+                            Console.WriteLine("Error FaceId:" + ErrorCode.ToString());
+                            context.Logger.LogError("Error FaceId:" + ErrorCode.ToString());
                             return "Error FaceId:" + ErrorCode.ToString();
                         }//Errorcode
                     }//detect device
                 }//foreach
+                context.Logger.LogTrace("Successfully raided device.");
                 return "Successfully raided device.";
             }
-            else { 
+            else 
+            {
+                context.Logger.LogTrace("No device list found.");
                 return "No device list found.";
             }//read device
         }//try

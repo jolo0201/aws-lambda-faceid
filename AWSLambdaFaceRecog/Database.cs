@@ -1,69 +1,15 @@
 ﻿using DotNetEnv;
 using MySql.Data.MySqlClient;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 class Database
 {
-
-    public static MySqlDataReader mExecuteReaderDbCon(string sql, string src = "mExecuteReaderDbCon")
-    {
-
-        try
-        {
-            using var connection = new MySqlConnection(Env.GetString("CONNECTION_STRING"));
-            connection.Open();
-
-            MySqlCommand command = new(sql, connection)
-            {
-                CommandTimeout = 0
-            };
-            return command.ExecuteReader();
-        }
-        catch (Exception)
-        {
-            MySqlDataReader? r = null;
-            return r;
-        }
-    }
-
-    public static string mExecuteReturnString(string script, string methodName = "")
-    {
-        string resultSet = "";
-
-        try
-        {
-            if (script.Length != 0)
-            {
-                using var connection = new MySqlConnection(Env.GetString("CONNECTION_STRING"));
-                connection.Open();
-
-                MySqlCommand cmd = new(script, connection)
-                {
-                    CommandTimeout = 0
-                };
-                resultSet = (string)cmd.ExecuteScalar();
-
-            }
-        }
-        catch (Exception ex)
-        {
-            resultSet = "";
-            Console.WriteLine($"Error {methodName}: {script} {ex.Message}");
-        }
-
-        return resultSet;
-    }
-
+   
     public static DateTime GetLatestDateRaid(string id)
     {
         DateTime startDate = DateTime.Now;
         try
         {
-            using var connection = new MySqlConnection(Env.GetString("CONNECTION_STRING"));
+            using var connection = new MySqlConnection($"{Env.GetString("CONNECTION_STRING")}");
             connection.Open();
 
             MySqlCommand command = new($"SELECT COALESCE(raid_dnt,NOW()) As result FROM time_logger_fr WHERE device_id = {id} ORDER BY raid_dnt DESC LIMIT 1;", connection)
@@ -100,13 +46,15 @@ class Database
         DateTime TimeNow;
         try
         {
-            using var conn = new MySqlConnection(Env.GetString("CONNECTION_STRING"));
+            using var conn = new MySqlConnection($"{Env.GetString("CONNECTION_STRING")}");
             conn.Open();
             MySqlCommand cmd_now = new("SELECT NOW();", conn)
             {
                 CommandTimeout = 0
             };
-            TimeNow = Convert.ToDateTime(cmd_now.ExecuteScalar());
+            string sTimeNow = (string)cmd_now.ExecuteScalar();
+            TimeNow = DateTime.Parse(sTimeNow);
+
             conn.Close();
         }
         catch (Exception)
@@ -121,9 +69,10 @@ class Database
     {
         try
         {
-            using var conn = new MySqlConnection(Env.GetString("CONNECTION_STRING"));
+
+            using var conn = new MySqlConnection($"{Env.GetString("CONNECTION_STRING")}");
             conn.Open();
-            var fSQL = @"
+            string fSQL = @"
                 INSERT INTO time_logger_fr(
                     date,
                     emp_id,
@@ -152,8 +101,6 @@ class Database
                 withBlock.Parameters.AddWithValue("@ns", ns);
                 withBlock.ExecuteNonQuery();
             }
-
-            Console.WriteLine("Successfully saved time log");
         }
         catch (Exception ex)
         {
