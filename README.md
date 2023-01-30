@@ -1,1 +1,2 @@
-# AWSLambdaFaceRecog
+# aws-lambda-faceid
+
