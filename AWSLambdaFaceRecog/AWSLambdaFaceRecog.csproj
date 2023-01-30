@@ -28,4 +28,7 @@
       <HintPath>FaceId.dll</HintPath>
     </Reference>
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="img\" />
+  </ItemGroup>
 </Project>
