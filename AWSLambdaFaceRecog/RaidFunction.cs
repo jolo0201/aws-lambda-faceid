@@ -1,8 +1,10 @@
 ﻿using Amazon.Lambda.Core;
 using Com.FirstSolver.Splash;
+using DotNetEnv;
 using Microsoft.VisualBasic;
 using MySql.Data.MySqlClient;
 using Newtonsoft.Json.Linq;
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 // Assembly attribute to enable the Lambda function's JSON input to be converted into a .NET class.
@@ -25,11 +27,14 @@ public class RaidFunction
         //Environment Variable from AWS
 
         //return json string
-        var jsonObject = new JObject();
+        var jsonSuccess = new JObject();
+        var jsonError = new JObject();
+        var getConnection = (Debugger.IsAttached) ? DotNetEnv.Env.GetString("CONNECTION_STRING") : Environment.GetEnvironmentVariable("CONNECTION_STRING");
+
         try
         {
             //Read active devices
-            using var connection = new MySqlConnection($"{Environment.GetEnvironmentVariable("CONNECTION_STRING")}");
+            using var connection = new MySqlConnection($"{getConnection}");
             connection.Open();
             MySqlCommand command = new("SELECT * FROM config_devices WHERE d_status = 1;", connection)
             {
@@ -53,9 +58,10 @@ public class RaidFunction
                 }//while
 
                 readDevice.Close(); //close reader
-
+                int deviceCtr = 0;
                 foreach (DeviceSettings deviceSetting in _devicesData) //Loop devices
                 {
+                    deviceCtr += 1;
                     //Check devices if active and connected
                     string detectDevice = Command.RunCommand("GetDeviceInfo()",
                                                     deviceSetting.IP,
@@ -68,10 +74,11 @@ public class RaidFunction
                     }
                     else 
                     {
+                    
                         string endDate = Strings.Format(Database.ServerNow(), "yyyy-MM-dd HH:mm:ss"); //Get Database Server time
                         string startDate = Strings.Format(Database.GetLatestDateRaid(deviceSetting.DeviceId), "yyyy-MM-dd HH:mm:ss"); //Get Latest Raided Date
                         string empId, fTime, fDate, fworkCode;
-                      
+
                         using FaceId Client = new(deviceSetting.IP, int.Parse(deviceSetting.Port));
                         Client.SecretKey = deviceSetting.SecretKey;
                         string commandString = "GetRecord(start_time=" + '"' + startDate + '"' + " end_time=" + '"' + endDate + '"' + ")";
@@ -98,56 +105,49 @@ public class RaidFunction
                                     fworkCode = Command.GetParameterValue(match.Groups[1].Value, "status", "authority");
                                     Database.TimeLoggerFR(empId, fworkCode, fTime, fDate, deviceSetting.DeviceId);
                                 }
-                                context.Logger.LogTrace($"Successfully raided ({dataCount}) rows of data. | {startDate} to {endDate}.");
+                                context.Logger.LogTrace($"{deviceSetting.DeviceName}: Successfully raided ({dataCount}) rows of data. | {startDate} to {endDate}.");
+                                jsonSuccess.Add($"dev_id:{deviceSetting.DeviceId}", $"{deviceSetting.DeviceName}: Successfully raided ({dataCount}) rows of data. | {startDate} to {endDate}.");
 
-                                jsonObject.Add("result", "success");
-                                jsonObject.Add("data_ctr", dataCount);
-                                jsonObject.Add("start_date", startDate);
-                                jsonObject.Add("end_date", endDate);
-
-                                return jsonObject.ToString();
+          
                             }
                             else
                             {
                                 context.Logger.LogTrace("Success but no matches.");
-                                jsonObject.Add("result", "success");
-                                jsonObject.Add("data_ctr", 0);
-                                jsonObject.Add("start_date", startDate);
-                                jsonObject.Add("end_date", endDate);
+                                jsonSuccess.Add($"dev_id:{deviceSetting.DeviceId}", $"No matches found. | {startDate} to {endDate}.");
 
-                                return jsonObject.ToString();
+
                             }//matches
                         }
                         else
                         {
                             Console.WriteLine("Error FaceId:" + ErrorCode.ToString());
                             context.Logger.LogError("Error FaceId:" + ErrorCode.ToString());
-                            jsonObject.Add("result", "error");
-                            jsonObject.Add("details","FaceId: " + ErrorCode.ToString());
-                            return jsonObject.ToString();
+                            jsonSuccess.Add($"dev_id:{deviceSetting.DeviceId}", $"FaceId Failed: {deviceSetting.IP}:{deviceSetting.Port}:{deviceSetting.SecretKey}");
+ 
                         }//Errorcode
                     }//detect device
                 }//foreach
-                context.Logger.LogTrace("Successfully raided device.");
-                jsonObject.Add("result", "success");
-                jsonObject.Add("details", "Successfully raided device.");
 
-                return jsonObject.ToString();
+                context.Logger.LogTrace($"Successfully raided devices: ({deviceCtr}).");
+
+                return jsonSuccess.ToString();
             }
             else 
             {
                 context.Logger.LogTrace("No device list found.");
-                jsonObject.Add("result", "success");
-                jsonObject.Add("details", "No device list found.");
-                return jsonObject.ToString();
+                jsonError.Add("result", "success");
+                jsonError.Add("data_ctr", 0);
+                jsonError.Add("details", "No device list found.");
+                return jsonError.ToString();
             }//read device
         }//try
         catch (Exception ex)
         {
             context.Logger.LogError($"Error in Lambda function:{ex}");
-            jsonObject.Add("result", "error");
-            jsonObject.Add("details", $"Error 404: {ex}");
-            return jsonObject.ToString();
+            jsonError.Add("result", "error");
+            jsonError.Add("data_ctr", 0);
+            jsonError.Add("details", $"Error in Lambda function:{ex}");
+            return jsonError.ToString();
         }
     }
 }

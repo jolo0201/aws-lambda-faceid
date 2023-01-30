@@ -1,43 +1,35 @@
 ﻿using DotNetEnv;
 using MySql.Data.MySqlClient;
+using System.Diagnostics;
 
 class Database
 {
    
     public static DateTime GetLatestDateRaid(string id)
     {
-        DateTime startDate = DateTime.Now;
+        DateTime serverTime;
         try
         {
-            using var connection = new MySqlConnection($"{Environment.GetEnvironmentVariable("CONNECTION_STRING")}");
-            connection.Open();
+            var getConnection = (Debugger.IsAttached) ? DotNetEnv.Env.GetString("CONNECTION_STRING") : Environment.GetEnvironmentVariable("CONNECTION_STRING");
 
-            MySqlCommand command = new($"SELECT COALESCE(raid_dnt,NOW()) As result FROM time_logger_fr WHERE device_id = {id} ORDER BY raid_dnt DESC LIMIT 1;", connection)
+            using var conn = new MySqlConnection($"{getConnection}");
+            conn.Open();
+            MySqlCommand cmdGetLatest = new($"SELECT COALESCE(raid_dnt,NOW()) As result FROM time_logger_fr WHERE device_id = {id} ORDER BY raid_dnt DESC LIMIT 1;", conn)
             {
                 CommandTimeout = 0
             };
-
-            MySqlDataReader readDate = command.ExecuteReader();
-
-            if (readDate.HasRows == true)
-            {
-                while (readDate.Read())
-                {
-                    startDate = DateTime.Parse((string)readDate["result"]);
-                }
-            }
-            else
-            {
-                startDate = DateTime.Parse("2021-01-01 00:00:00");
-            }
+            var sTimeNow = cmdGetLatest.ExecuteScalar();
+            DateTime serverTimeConverted = DateTime.Parse(sTimeNow.ToString());
+            serverTime = (sTimeNow == null) ? DateTime.Now : serverTimeConverted;
+            return serverTime;
 
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            return startDate;
+            Console.WriteLine("GetLatestDateRaid: " + ex.ToString());
+            return DateTime.Now;
         }
 
-        return startDate;
     }
 
 
@@ -46,31 +38,37 @@ class Database
         DateTime TimeNow;
         try
         {
-            using var conn = new MySqlConnection($"{Environment.GetEnvironmentVariable("CONNECTION_STRING")}");
+            var getConnection = (Debugger.IsAttached) ? DotNetEnv.Env.GetString("CONNECTION_STRING") : Environment.GetEnvironmentVariable("CONNECTION_STRING");
+
+            using var conn = new MySqlConnection($"{getConnection}");
             conn.Open();
             MySqlCommand cmd_now = new("SELECT NOW();", conn)
             {
                 CommandTimeout = 0
             };
-            string sTimeNow = (string)cmd_now.ExecuteScalar();
-            TimeNow = DateTime.Parse(sTimeNow);
+            var sTimeNow = cmd_now.ExecuteScalar();
+            DateTime timeConverted = DateTime.Parse(sTimeNow.ToString());
+            TimeNow = (sTimeNow == null) ? DateTime.Now : timeConverted;
 
-            conn.Close();
+            return TimeNow;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Console.WriteLine("ServerNow: " + ex.ToString());
+
             return DateTime.Now;
         }
 
-        return TimeNow;
+      
     }
 
     public static void TimeLoggerFR(string emp_id, string work_code, string time, string dateString, string device_id, string source = "6", int ns = 0)
     {
         try
         {
+            var getConnection = (Debugger.IsAttached) ? DotNetEnv.Env.GetString("CONNECTION_STRING") : Environment.GetEnvironmentVariable("CONNECTION_STRING");
 
-            using var conn = new MySqlConnection($"{Environment.GetEnvironmentVariable("CONNECTION_STRING")}");
+            using var conn = new MySqlConnection($"{getConnection}");
             conn.Open();
             string fSQL = @"
                 INSERT INTO time_logger_fr(
