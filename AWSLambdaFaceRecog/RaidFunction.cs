@@ -1,11 +1,9 @@
 ﻿using Amazon.Lambda.Core;
 using Com.FirstSolver.Splash;
-using DotNetEnv;
 using Microsoft.VisualBasic;
 using MySql.Data.MySqlClient;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 // Assembly attribute to enable the Lambda function's JSON input to be converted into a .NET class.
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.SystemTextJson.DefaultLambdaJsonSerializer))]
@@ -24,11 +22,11 @@ public class RaidFunction
         //Load ENV file configuration if local
         DotNetEnv.Env.TraversePath().Load();
 
-        //Environment Variable from AWS
-
         //return json string
         var jsonSuccess = new JObject();
         var jsonError = new JObject();
+
+        //Environment Variable if AWS
         var getConnection = (Debugger.IsAttached) ? DotNetEnv.Env.GetString("CONNECTION_STRING") : Environment.GetEnvironmentVariable("CONNECTION_STRING");
 
         try
@@ -58,10 +56,8 @@ public class RaidFunction
                 }//while
 
                 readDevice.Close(); //close reader
-                int deviceCtr = 0;
                 foreach (DeviceSettings deviceSetting in _devicesData) //Loop devices
                 {
-                    deviceCtr += 1;
                     //Check devices if active and connected
                     string detectDevice = Command.RunCommand("GetDeviceInfo()",
                                                     deviceSetting.IP,
@@ -70,6 +66,7 @@ public class RaidFunction
 
                     if (!detectDevice.Contains("success"))
                     {
+                        Console.WriteLine($"Cannot connect to device: {deviceSetting.DeviceName}.");
                         context.Logger.Log($"Cannot connect to device: {deviceSetting.DeviceName}.");
                     }
                     else 
@@ -105,22 +102,25 @@ public class RaidFunction
                                     fworkCode = Command.GetParameterValue(match.Groups[1].Value, "status", "authority");
                                     Database.TimeLoggerFR(empId, fworkCode, fTime, fDate, deviceSetting.DeviceId);
                                 }
+                                Console.WriteLine($"Device Name:{deviceSetting.DeviceName}" +
+                                    $"Date Count: {dataCount}" +
+                                    $"Date Start: {startDate}" +
+                                    $"Date End: {endDate}");
                                 context.Logger.LogTrace($"{deviceSetting.DeviceName}: Successfully raided ({dataCount}) rows of data. | {startDate} to {endDate}.");
                                 jsonSuccess.Add($"dev_id:{deviceSetting.DeviceId}", $"{deviceSetting.DeviceName}: Successfully raided ({dataCount}) rows of data. | {startDate} to {endDate}.");
-
-          
                             }
                             else
                             {
+                                Console.WriteLine($"Data Count:0 (No matches)" +
+                                    $"Date Start: {startDate}" +
+                                    $"Date End: {endDate}");
                                 context.Logger.LogTrace("Success but no matches.");
                                 jsonSuccess.Add($"dev_id:{deviceSetting.DeviceId}", $"No matches found. | {startDate} to {endDate}.");
-
-
                             }//matches
                         }
                         else
                         {
-                            Console.WriteLine("Error FaceId:" + ErrorCode.ToString());
+                            Console.WriteLine($"Error FaceId {deviceSetting.DeviceName}:{ErrorCode}");
                             context.Logger.LogError("Error FaceId:" + ErrorCode.ToString());
                             jsonSuccess.Add($"dev_id:{deviceSetting.DeviceId}", $"FaceId Failed: {deviceSetting.IP}:{deviceSetting.Port}:{deviceSetting.SecretKey}");
  
@@ -128,21 +128,23 @@ public class RaidFunction
                     }//detect device
                 }//foreach
 
-                context.Logger.LogTrace($"Successfully raided devices: ({deviceCtr}).");
-
+                Console.WriteLine($"Successfully raided devices: ({_devicesData.Count}).");
+                context.Logger.LogTrace($"Successfully raided devices: ({_devicesData.Count}).");
                 return jsonSuccess.ToString();
             }
             else 
             {
-                context.Logger.LogTrace("No device list found.");
+                Console.WriteLine("No device found in the list.");
+                context.Logger.LogTrace("No device found in the list.");
                 jsonError.Add("result", "success");
                 jsonError.Add("data_ctr", 0);
-                jsonError.Add("details", "No device list found.");
+                jsonError.Add("details", "No device found in the list.");
                 return jsonError.ToString();
             }//read device
         }//try
         catch (Exception ex)
         {
+            Console.WriteLine($"Error in Lambda function:{ex}");
             context.Logger.LogError($"Error in Lambda function:{ex}");
             jsonError.Add("result", "error");
             jsonError.Add("data_ctr", 0);
