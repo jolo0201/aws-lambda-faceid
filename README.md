@@ -27,6 +27,6 @@ It uses cron job (Eventbridge) trigger with a fixed time of 5 mins to invoke the
 When invoked, the function checks the list of active devices, connect to them and try to raid data from the device and sync it to Aurora DB.
 
 ### How to invoke
-The function can be manually invoke using this link: [Invoke Me](rERC5b4PoR51qWEvAWuJsX6yRVRBvRVta7.lambda-url.ap-southeast-1.on.aws)
+The function can be manually invoke using this link: [Invoke Me](1BvTfDQa4VVtLBkknXYZHy67oE61SMpZNe.lambda-url.ap-southeast-1.on.aws)
 
 ### Copyright 2023
